@@ -79,7 +79,7 @@ if __name__ == "__main__":
     train_loader, val_loader, test_loader = setup_dataloaders(imdb_tokenized)
 
     model = AutoModelForSequenceClassification.from_pretrained(
-        'distilroberta-base', num_labels=2
+        "distilbert-base-uncased", num_labels=2
     )
 
     # Freeze all layers
@@ -115,7 +115,7 @@ if __name__ == "__main__":
     logger = CSVLogger(save_dir="logs/", name=f"my-model-{args.device}")
 
     trainer = L.Trainer(
-        max_epochs=3,
+        max_epochs=5,
         callbacks=callbacks,
         accelerator="gpu",
         precision="16-mixed",
@@ -168,6 +168,6 @@ if __name__ == "__main__":
         print(s), f.write(s+"\n")    
 
     # Cleanup
-    # log_dir = f"logs/my-model-{args.device}"
-    # if os.path.exists(log_dir):
-    #     shutil.rmtree(log_dir)
+    log_dir = f"logs/my-model-{args.device}"
+    if os.path.exists(log_dir):
+        shutil.rmtree(log_dir)
