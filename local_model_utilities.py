@@ -62,6 +62,7 @@ class CustomLightningModule(L.LightningModule):
 
         self.learning_rate = learning_rate
         self.model = model
+        self.train_acc = torchmetrics.Accuracy(task="multiclass", num_classes=2)
 
         self.val_acc = torchmetrics.Accuracy(task="multiclass", num_classes=2)
         self.test_acc = torchmetrics.Accuracy(task="multiclass", num_classes=2)
@@ -72,8 +73,12 @@ class CustomLightningModule(L.LightningModule):
     def training_step(self, batch, batch_idx):
         outputs = self(batch["input_ids"], attention_mask=batch["attention_mask"],
                        labels=batch["label"])
+        loss = outputs["loss"]
+        logits = outputs["logits"]
+        self.train_acc(torch.argmax(logits, 1), batch["label"])                       
         self.log("train_loss", outputs["loss"])
-        return outputs["loss"]  # this is passed to the optimizer for training
+        self.log("train_acc", self.train_acc)
+        return outputs["loss"]    
 
     def validation_step(self, batch, batch_idx):
         outputs = self(batch["input_ids"], attention_mask=batch["attention_mask"],
