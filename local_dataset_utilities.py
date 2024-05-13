@@ -139,7 +139,7 @@ def tokenization():
     tokenizer = AutoTokenizer.from_pretrained("distilbert-base-uncased")
 
     def tokenize_text(batch):
-        return tokenizer(batch["text"], truncation=True, padding="max_length", max_length=512)
+        return tokenizer(batch["text"], truncation=True, padding=True, max_length=512)
 
     imdb_tokenized = imdb_dataset.map(tokenize_text, batched=True, batch_size=None)
     imdb_tokenized.set_format("torch", columns=["input_ids", "attention_mask", "label"])
