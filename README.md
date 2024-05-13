@@ -27,15 +27,15 @@ run following batch file - run_DistilBert_gpu.SBATCH with appropriate command li
 
 following is the list of command line arguments - <br>
 
---q_lora boolean -> To enable QLoRA or not <br>
---lora_r int     -> Rank for LoRA layers <br>
---lora_alpha int  -> Alpha for LoRA layers <br>
---lora_query boolean ->  Apply LoRA to query <br>
---lora_key  boolean  ->  Apply LoRA to key <br>
---lora_value boolean -> Apply LoRA to value <br>
---lora_projection boolean -> Apply LoRA to projection layer <br>
---lora_mlp booealn -> Apply LoRA to MLP <br>
---lora_head boolean -> Apply LoRA to head <br>
+--q_lora (boolean) -> To enable QLoRA or not <br>
+--lora_r (int)     -> Rank for LoRA layers <br>
+--lora_alpha (int)  -> Alpha for LoRA layers <br>
+--lora_query (boolean) ->  Apply LoRA to query <br>
+--lora_key  (boolean)  ->  Apply LoRA to key <br>
+--lora_value (boolean) -> Apply LoRA to value <br>
+--lora_projection (boolean) -> Apply LoRA to linear projection layer <br>
+--lora_mlp (booealn) -> Apply LoRA to linear MLP layer <br>
+--lora_head (boolean) -> Apply LoRA to linear attention head <br>
 
 
 
