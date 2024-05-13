@@ -42,6 +42,9 @@ following is the list of command line arguments - <br>
 
 <h3> Results  </h3>
 
+Plots are added in the plots directory of this repository. <br>
+Profiler results can be found in the log folder inside the log files <br>
+
 <ul>
 <li> Finetuning using LoRA (r=8,alpha=16), Test Accuracy - 89.71%</li>
 <li> Finetuning without LoRA (selective finetuning), Test Accuracy - 87.39%</li>
