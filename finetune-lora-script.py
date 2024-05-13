@@ -1,6 +1,4 @@
 import argparse
-import os
-import shutil
 import time
 from functools import partial
 
@@ -8,12 +6,13 @@ import lightning as L
 from lightning.pytorch.loggers import CSVLogger
 from lightning.pytorch.callbacks import ModelCheckpoint
 
-from transformers import AutoModelForSequenceClassification
+from transformers import AutoModelForSequenceClassification, BitsAndBytesConfig
 import torch
 
 from local_dataset_utilities import tokenization, setup_dataloaders, get_dataset
 from local_model_utilities import CustomLightningModule
-
+import torch.profiler
+from torch.profiler import profile, ProfilerActivity
 
 def str2bool(v):
     if isinstance(v, bool):
@@ -58,6 +57,7 @@ def count_parameters(model):
 if __name__ == "__main__":
 
     parser = argparse.ArgumentParser(description='LoRA parameters configuration')
+    parser.add_argument('--q_lora', type=str2bool, default=False, help='Apply QLoRA')
     parser.add_argument('--lora_r', type=int, default=8, help='Rank for LoRA layers')
     parser.add_argument('--lora_alpha', type=int, default=16, help='Alpha for LoRA layers')
     parser.add_argument('--lora_query', type=str2bool, default=True, help='Apply LoRA to query')
@@ -78,9 +78,15 @@ if __name__ == "__main__":
     imdb_tokenized = tokenization()
     train_loader, val_loader, test_loader = setup_dataloaders(imdb_tokenized)
 
-    model = AutoModelForSequenceClassification.from_pretrained(
-        "distilbert-base-uncased", num_labels=2
-    )
+    if args.q_lora:
+        nf4_config = BitsAndBytesConfig(load_in_4bit=True, bnb_4bit_quant_type="nf4")
+        model = AutoModelForSequenceClassification.from_pretrained(
+            "distilbert-base-uncased", num_labels=2, quantization_config=nf4_config
+        )
+    else:
+        model = AutoModelForSequenceClassification.from_pretrained(
+            "distilbert-base-uncased", num_labels=2
+        )
 
     # Freeze all layers
     for param in model.parameters():
@@ -107,18 +113,23 @@ if __name__ == "__main__":
     print("Total number of trainable parameters:", count_parameters(model))
 
     lightning_model = CustomLightningModule(model)
-    callbacks = [
-        ModelCheckpoint(
-            save_top_k=1, mode="max", monitor="val_acc"
-        )  # save top 1 model
-    ]
+
+    callbacks = ModelCheckpoint(
+        dirpath='./checkpoints_imdb',     # Directory where the checkpoints will be saved
+        filename='checkpoint-{epoch}',  # Name of the checkpoint files, including the epoch                
+        save_last=True              # Additionally save the last checkpoint to a separate file
+    )
+
     logger = CSVLogger(save_dir="logs/", name=f"my-model-{args.device}")
 
+    num_epochs = 5
+    precision="16-mixed"
+
     trainer = L.Trainer(
-        max_epochs=5,
+        max_epochs=num_epochs,
         callbacks=callbacks,
         accelerator="gpu",
-        precision="16-mixed",
+        precision=precision,
         devices=[int(args.device)],
         logger=logger,
         log_every_n_steps=10,
@@ -137,9 +148,25 @@ if __name__ == "__main__":
     elapsed = end - start
     print(f"Time elapsed {elapsed/60:.2f} min")
 
+    print('Memory statistics - ')
+    total_memory = sum(p.numel() * p.element_size() for p in model.parameters() if p.requires_grad)    
+    print("Total memory usage (GB):", total_memory*1e-9)
+
+
     train_acc = trainer.test(lightning_model, dataloaders=train_loader, ckpt_path="best", verbose=False)
     val_acc = trainer.test(lightning_model, dataloaders=val_loader, ckpt_path="best", verbose=False)
     test_acc = trainer.test(lightning_model, dataloaders=test_loader, ckpt_path="best", verbose=False)
+
+    # profiling our model
+    with profile(activities=[ProfilerActivity.CPU, ProfilerActivity.CUDA],
+                 profile_memory=True, record_shapes=True, with_stack=False) as prof:
+                 trainer.test(lightning_model, dataloaders=test_loader, ckpt_path="best", verbose=False)
+
+
+    print("Profiling has been completed and saved.")    
+    print(prof.key_averages().table(sort_by="cuda_time_total", row_limit=10))
+    print(prof.key_averages().table(sort_by="cuda_memory_usage", row_limit=10))
+    prof.export_chrome_trace("./trace.json")
 
     # Print all argparse settings
     print("------------------------------------------------")
@@ -165,9 +192,4 @@ if __name__ == "__main__":
         s = f"Test acc:  {test_acc[0]['accuracy']*100:2.2f}%"
         print(s), f.write(s+"\n")
         s = "------------------------------------------------"
-        print(s), f.write(s+"\n")    
-
-    # Cleanup
-    log_dir = f"logs/my-model-{args.device}"
-    if os.path.exists(log_dir):
-        shutil.rmtree(log_dir)
+        print(s), f.write(s+"\n")  
